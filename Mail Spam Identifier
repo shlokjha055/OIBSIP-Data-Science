@@ -1,0 +1,136 @@
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+import re
+import string
+
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+
+import warnings
+warnings.filterwarnings('ignore')
+
+
+
+df = pd.read_csv(
+    r"C:\Users\shlok\Python\Task 4\spam.csv",
+    encoding='latin-1'
+)
+
+
+df = df[['v1', 'v2']]
+df.columns = ['label', 'message']
+
+print("Dataset Loaded Successfully!")
+print("Dataset Shape:", df.shape)
+print("\nFirst 5 rows:")
+print(df.head())
+
+
+
+print("\nClass Distribution:")
+print(df['label'].value_counts())
+
+
+df['label'].value_counts().plot(kind='bar')
+plt.title("Spam vs Ham Distribution")
+plt.xlabel("Label")
+plt.ylabel("Count")
+plt.show()
+
+
+
+def clean_text(text):
+    text = text.lower()
+    text = re.sub(r'\d+', '', text)  
+    text = text.translate(str.maketrans('', '', string.punctuation))  
+    text = text.strip()
+    return text
+
+df['message'] = df['message'].apply(clean_text)
+
+
+
+df['label'] = df['label'].map({'ham': 0, 'spam': 1})
+
+
+
+X = df['message']
+y = df['label']
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y,
+    test_size=0.2,
+    random_state=42,
+    stratify=y
+)
+
+
+
+tfidf = TfidfVectorizer(stop_words='english', max_df=0.9)
+
+X_train_tfidf = tfidf.fit_transform(X_train)
+X_test_tfidf = tfidf.transform(X_test)
+
+
+
+
+
+nb_model = MultinomialNB()
+nb_model.fit(X_train_tfidf, y_train)
+nb_predictions = nb_model.predict(X_test_tfidf)
+
+
+lr_model = LogisticRegression()
+lr_model.fit(X_train_tfidf, y_train)
+lr_predictions = lr_model.predict(X_test_tfidf)
+
+
+
+
+print("\n--- Naive Bayes Evaluation ---")
+print("Accuracy:", accuracy_score(y_test, nb_predictions))
+print(classification_report(y_test, nb_predictions))
+
+print("\n--- Logistic Regression Evaluation ---")
+print("Accuracy:", accuracy_score(y_test, lr_predictions))
+print(classification_report(y_test, lr_predictions))
+
+
+
+cm = confusion_matrix(y_test, lr_predictions)
+
+plt.imshow(cm)
+plt.colorbar()
+plt.xticks([0, 1], ['Ham', 'Spam'])
+plt.yticks([0, 1], ['Ham', 'Spam'])
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
+plt.title("Confusion Matrix - Logistic Regression")
+
+for i in range(2):
+    for j in range(2):
+        plt.text(j, i, cm[i, j], ha="center", va="center")
+
+plt.show()
+
+
+
+def predict_spam(text):
+    text = clean_text(text)
+    text_vector = tfidf.transform([text])
+    prediction = lr_model.predict(text_vector)
+    return "Spam" if prediction[0] == 1 else "Not Spam"
+
+
+
+test_message_1 = "Congratulations! You have won a free iPhone. Click now!"
+test_message_2 = "Hey, are we meeting tomorrow evening?"
+
+print("\nTest Message 1:", predict_spam(test_message_1))
+print("Test Message 2:", predict_spam(test_message_2))
