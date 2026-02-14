@@ -1,0 +1,76 @@
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+
+
+df = pd.read_csv(r'C:\Users\shlok\Python\Task 1\iris.csv')
+print("✅ Dataset loaded!")
+print("Shape:", df.shape)
+print("Columns:", df.columns.tolist())
+print("\nFirst 5 rows:")
+print(df.head())
+
+
+species_col = None
+for col in ['Species', 'variety', 'class', 'target']:
+    if col in df.columns:
+        species_col = col
+        break
+if species_col is None:
+    species_col = df.columns[-1]
+
+print(f"\n🔍 Target column: '{species_col}'")
+print("Species distribution:")
+print(df[species_col].value_counts())
+
+
+numeric_cols = df.select_dtypes(include=[np.number]).columns
+feature_candidates = [col for col in numeric_cols if any(x in col.lower() for x in ['sepal', 'petal', 'length', 'width'])]
+
+if len(feature_candidates) >= 4:
+    feature_cols = feature_candidates[:4]
+else:
+    feature_cols = numeric_cols[:4]
+
+print(f"\n✅ Using features: {feature_cols}")
+
+X = df[feature_cols]
+y_series = df[species_col]
+
+
+le = LabelEncoder()
+y = le.fit_transform(y_series)
+
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+
+
+model = LogisticRegression(max_iter=200)
+model.fit(X_train, y_train)
+print("✅ Model trained!")
+
+
+y_pred = model.predict(X_test)
+print(f"\n🎯 ACCURACY: {accuracy_score(y_test, y_pred):.2f}")
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred, target_names=le.classes_))
+
+
+print("\n🧪 Testing new flowers:")
+print("Feature order must match training:", feature_cols)  
+
+
+new_flowers_dict = {
+    feature_cols[0]: [5.1, 6.2, 5.8],    # sepal length
+    feature_cols[1]: [3.5, 2.8, 2.7],    # sepal width  
+    feature_cols[2]: [1.4, 4.8, 4.0],    # petal length
+    feature_cols[3]: [0.2, 1.8, 1.2]     # petal width
+}
+new_flowers_df = pd.DataFrame(new_flowers_dict)
+
+new_predictions = model.predict(new_flowers_df)
+print("Predictions:", [le.inverse_transform([p])[0] for p in new_predictions])
+print("Expected: Setosa, Virginica, Versicolor ✅")
