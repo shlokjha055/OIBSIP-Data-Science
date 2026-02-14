@@ -1,0 +1,96 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+
+df1 = pd.read_csv(r'C:\Users\shlok\Python\Task 2\Unemployment in India.csv')
+df2 = pd.read_csv(r'C:\Users\shlok\Python\Task 2\Unemployment_Rate_upto_11_2020.csv')
+
+print("YOUR ACTUAL COLUMNS:")
+print("DF1:", df1.columns.tolist())
+print("DF2:", df2.columns.tolist())
+
+
+def process_dataset(df, name):
+    print(f"\nProcessing {name}:")
+    
+    
+    date_cols = [col for col in df.columns if any(x in col.lower() for x in ['date', 'month', 'year', 'time'])]
+    rate_cols = [col for col in df.columns if 'unemployment' in col.lower() or 'rate' in col.lower()]
+    region_cols = [col for col in df.columns if any(x in col.lower() for x in ['region', 'state', 'area'])]
+    
+    print(f"Date candidates: {date_cols}")
+    print(f"Rate candidates: {rate_cols}")
+    print(f"Region candidates: {region_cols}")
+    
+    
+    date_col = date_cols[0] if date_cols else df.columns[0]
+    rate_col = rate_cols[0] if rate_cols else None
+    region_col = region_cols[0] if region_cols else None
+    
+    
+    df_out = pd.DataFrame()
+    df_out['Date'] = pd.to_datetime(df[date_col], dayfirst=True, errors='coerce')
+    if rate_col:
+        df_out['Rate'] = pd.to_numeric(df[rate_col], errors='coerce')
+    if region_col:
+        df_out['Region'] = df[region_col]
+    else:
+        df_out['Region'] = name
+    
+    return df_out.dropna()
+
+
+df1_clean = process_dataset(df1, 'Dataset1')
+df2_clean = process_dataset(df2, 'Dataset2')
+
+
+df = pd.concat([df1_clean, df2_clean], ignore_index=True)
+df = df.dropna().sort_values('Date').reset_index(drop=True)
+
+print(f"\n✅ FINAL DATA: {len(df)} rows from {df['Region'].nunique()} regions")
+
+
+fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+fig.suptitle('INDIA UNEMPLOYMENT TRENDS - COVID-19', fontsize=18, fontweight='bold')
+
+
+national = df.groupby('Date')['Rate'].mean().reset_index()
+axes[0,0].plot(national['Date'], national['Rate'], 'b-o', linewidth=3, markersize=6)
+axes[0,0].axvline(pd.to_datetime('2020-03-24'), color='red', ls='--', label='Lockdown', linewidth=2)
+axes[0,0].set_title('📈 NATIONAL TREND', fontweight='bold', fontsize=14)
+axes[0,0].set_xlabel('Date')
+axes[0,0].set_ylabel('Rate (%)')
+axes[0,0].legend()
+axes[0,0].grid(True, alpha=0.3)
+axes[0,0].tick_params(axis='x', rotation=45)
+
+
+top_regions = df.groupby('Region')['Rate'].mean().nlargest(10)
+colors = plt.cm.Set3(range(len(top_regions)))
+top_regions.plot(kind='bar', ax=axes[0,1], color=colors)
+axes[0,1].set_title('🏆 TOP 10 REGIONS', fontweight='bold', fontsize=14)
+axes[0,1].set_ylabel('Average Rate (%)')
+axes[0,1].tick_params(axis='x', rotation=45)
+
+
+axes[1,0].hist(df['Rate'], bins=20, color='teal', alpha=0.7, edgecolor='black', linewidth=1.2)
+axes[1,0].set_title('📊 DISTRIBUTION', fontweight='bold', fontsize=14)
+axes[1,0].set_xlabel('Unemployment Rate (%)')
+axes[1,0].set_ylabel('Frequency')
+axes[1,0].grid(True, alpha=0.3)
+
+
+top10_regions = df['Region'].value_counts().head(10).index
+sample_data = df[df['Region'].isin(top10_regions)]
+sns.boxplot(data=sample_data, x='Region', y='Rate', ax=axes[1,1])
+axes[1,1].set_title('📦 REGIONS COMPARISON', fontweight='bold', fontsize=14)
+axes[1,1].set_ylabel('Rate (%)')
+axes[1,1].tick_params(axis='x', rotation=45)
+
+plt.tight_layout()
+plt.show()
+
+print("\n🎉 CLEAN DASHBOARD COMPLETE!")
+print(f"📈 Data points: {len(df)}")
+print(f"📊 Rate range: {df['Rate'].min():.1f}% - {df['Rate'].max():.1f}%")
